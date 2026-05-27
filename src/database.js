@@ -260,6 +260,8 @@ db.exec(`
 try { db.exec("ALTER TABLE tickets ADD COLUMN channel_name TEXT"); } catch {}
 try { db.exec("ALTER TABLE tickets ADD COLUMN inactivity_warned_at TEXT"); } catch {}
 try { db.exec("ALTER TABLE ratings ADD COLUMN target_id TEXT"); } catch {}
+try { db.exec("ALTER TABLE applications ADD COLUMN created_at TEXT"); } catch {}
+try { db.exec("ALTER TABLE applications ADD COLUMN message_id TEXT"); } catch {}
 try { db.exec("ALTER TABLE giveaways ADD COLUMN ended_by TEXT"); } catch {}
 try { db.exec("ALTER TABLE giveaways ADD COLUMN sos_player1 TEXT"); } catch {}
 try { db.exec("ALTER TABLE giveaways ADD COLUMN sos_player2 TEXT"); } catch {}

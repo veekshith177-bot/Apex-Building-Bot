@@ -95,6 +95,12 @@ SFTP_HOST=sftp_host_here
 SFTP_PORT=22
 SFTP_USERNAME=sftp_username_here
 SFTP_PASSWORD=sftp_password_here
+
+# Dashboard (recommended)
+# Protects the dashboard + API with HTTP Basic Auth.
+DASHBOARD_PORT=2024
+DASHBOARD_USERNAME=admin
+DASHBOARD_PASSWORD=your_strong_password_here
 ```
 
 ### 4. Deploy Slash Commands

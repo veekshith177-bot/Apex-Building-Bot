@@ -1,7 +1,7 @@
 import { EmbedBuilder, MessageFlags } from 'discord.js';
 import { checkCooldown } from '../utils.js';
 import { info, error as logError } from '../logger.js';
-import { handleApplyButton, handleApplySkip, handleAccept, handleAcceptSubmit, handleReject, handleRejectSubmit } from './applyFlow.js';
+import { handleApplyButton, handleApplySkip, handleAccept, handleAcceptSubmit, handleReject, handleRejectSubmit, handleInstantAccept, handleInstantDeny, handleApplyTicket } from './applyFlow.js';
 import { handlePanelSelect, handleTicketButton, handleModalSubmit } from './handlers/ticketCreate.js';
 import { handleCloseRequest, handleCloseConfirm, handleCloseCancel, handleRatingButton, handleRatingModal, handleBuilderRatingButton, handleBuilderRatingModal } from './handlers/ticketClose.js';
 import { handleGiveawayEnter, handleSosChoice } from './handlers/giveawayEnter.js';
@@ -52,8 +52,14 @@ export default async function (client, interaction) {
       if (id === 'apply_partner') return handleApplyButton(interaction, 'partner');
       if (id === 'glist_prev' || id === 'glist_next') return handleGiveawayListNav(interaction);
       if (id.startsWith('apply_skip_')) return handleApplySkip(interaction, id.split('_')[2]);
+      if (id.startsWith('apply_ia_')) return handleInstantAccept(client, interaction, id.split('_')[2]);
+      if (id.startsWith('apply_id_')) return handleInstantDeny(client, interaction, id.split('_')[2]);
+      if (id.startsWith('apply_ticket_')) return handleApplyTicket(client, interaction, id.split('_')[2]);
       if (id.startsWith('apply_accept_')) return handleAccept(client, interaction, id.split('_')[2]);
       if (id.startsWith('apply_reject_')) return handleReject(client, interaction, id.split('_')[2]);
+      if (id.startsWith('apply_ia_')) return handleInstantAccept(client, interaction, id.split('_')[2]);
+      if (id.startsWith('apply_id_')) return handleInstantDeny(client, interaction, id.split('_')[2]);
+      if (id.startsWith('apply_ticket_')) return handleApplyTicket(client, interaction, id.split('_')[2]);
       if (id.startsWith('loa_accept_')) return handleLoaAccept(interaction);
       if (id.startsWith('loa_reject_')) return handleLoaReject(interaction);
     }

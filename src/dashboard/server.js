@@ -1,8 +1,9 @@
 import http from 'http';
 import fs from 'fs';
 import path from 'path';
+import crypto from 'crypto';
 import { fileURLToPath } from 'url';
-import { info } from '../logger.js';
+import { info, warn } from '../logger.js';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const publicDir = path.join(__dirname, 'public');
@@ -32,6 +33,44 @@ function sendError(res, msg, status = 500) {
 function parseUrl(req) {
   const url = new URL(req.url, `http://${req.headers.host || 'localhost'}`);
   return { pathname: url.pathname, searchParams: url.searchParams };
+}
+
+function safeEqual(a, b) {
+  const aBuf = Buffer.from(String(a ?? ''), 'utf8');
+  const bBuf = Buffer.from(String(b ?? ''), 'utf8');
+  if (aBuf.length !== bBuf.length) return false;
+  return crypto.timingSafeEqual(aBuf, bBuf);
+}
+
+function parseBasicAuth(req) {
+  const header = req.headers.authorization || '';
+  const [scheme, encoded] = header.split(' ');
+  if (!scheme || scheme.toLowerCase() !== 'basic' || !encoded) return null;
+  let decoded = '';
+  try {
+    decoded = Buffer.from(encoded, 'base64').toString('utf8');
+  } catch {
+    return null;
+  }
+  const idx = decoded.indexOf(':');
+  if (idx < 0) return null;
+  return { username: decoded.slice(0, idx), password: decoded.slice(idx + 1) };
+}
+
+function requireDashboardAuth(req, res, authCfg) {
+  if (!authCfg?.enabled) return true;
+
+  const creds = parseBasicAuth(req);
+  const okUser = safeEqual(creds?.username ?? '', authCfg.username);
+  const okPass = safeEqual(creds?.password ?? '', authCfg.password);
+  if (okUser && okPass) return true;
+
+  res.writeHead(401, {
+    'Content-Type': 'text/plain; charset=utf-8',
+    'WWW-Authenticate': 'Basic realm=\"Apex Dashboard\", charset=\"UTF-8\"',
+  });
+  res.end('Unauthorized');
+  return false;
 }
 
 function apiRoutes(db) {
@@ -263,9 +302,21 @@ function serveStatic(pathname, res) {
 
 export function startDashboard(db, port) {
   const apiRouter = apiRoutes(db);
+  const dashboardPassword = String(process.env.DASHBOARD_PASSWORD || '');
+  const authCfg = {
+    enabled: dashboardPassword.length > 0,
+    username: String(process.env.DASHBOARD_USERNAME || 'admin'),
+    password: dashboardPassword,
+  };
+
+  if (!authCfg.enabled) {
+    warn('Dashboard is running WITHOUT auth. Set DASHBOARD_PASSWORD to enable Basic Auth.');
+  }
 
   const server = http.createServer((req, res) => {
     const { pathname, searchParams } = parseUrl(req);
+
+    if (!requireDashboardAuth(req, res, authCfg)) return;
 
     if (pathname.startsWith('/api/')) {
       if (apiRouter(pathname, searchParams, req, res)) return;
