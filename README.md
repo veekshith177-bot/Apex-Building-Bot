@@ -101,6 +101,10 @@ SFTP_PASSWORD=sftp_password_here
 DASHBOARD_PORT=2024
 DASHBOARD_USERNAME=admin
 DASHBOARD_PASSWORD=your_strong_password_here
+
+# Optional: allow cross-origin dashboard API access (not needed for the built-in UI)
+# Example: https://yourdomain.com  (avoid "*" unless you understand the risk)
+DASHBOARD_CORS_ORIGIN=
 ```
 
 ### 4. Deploy Slash Commands

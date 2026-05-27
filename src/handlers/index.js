@@ -129,7 +129,9 @@ async function handleReactionRoleAdd(client, reaction, user) {
   const rr = rrs.find(r => reaction.emoji.toString() === r.emoji || reaction.emoji.name === r.emoji);
   if (!rr) return;
 
-  const member = reaction.message.guild.members.cache.get(user.id);
+  const member =
+    reaction.message.guild.members.cache.get(user.id) ||
+    (await reaction.message.guild.members.fetch(user.id).catch(() => null));
   if (!member) return;
 
   const role = reaction.message.guild.roles.cache.get(rr.role_id);
@@ -146,7 +148,9 @@ async function handleReactionRoleRemove(client, reaction, user) {
   const rr = rrs.find(r => reaction.emoji.toString() === r.emoji || reaction.emoji.name === r.emoji);
   if (!rr) return;
 
-  const member = reaction.message.guild.members.cache.get(user.id);
+  const member =
+    reaction.message.guild.members.cache.get(user.id) ||
+    (await reaction.message.guild.members.fetch(user.id).catch(() => null));
   if (!member) return;
 
   const role = reaction.message.guild.roles.cache.get(rr.role_id);

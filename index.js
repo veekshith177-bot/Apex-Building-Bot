@@ -10,7 +10,7 @@ if (!process.env.DISCORD_TOKEN) {
 }
 
 const PORT = parseInt(process.env.DASHBOARD_PORT) || 2024;
-startDashboard(db, PORT);
+const dashboardServer = startDashboard(db, PORT);
 
 info(`Starting bot (Node ${process.version})...`);
 
@@ -57,6 +57,34 @@ client.login(process.env.DISCORD_TOKEN).catch(e => {
   error('Login failed:', e.message);
   process.exit(1);
 });
+
+let shuttingDown = false;
+async function shutdown(signal) {
+  if (shuttingDown) return;
+  shuttingDown = true;
+  warn(`Shutting down (${signal})...`);
+
+  await new Promise((resolve) => {
+    try {
+      dashboardServer?.close(() => resolve());
+    } catch {
+      resolve();
+    }
+  });
+
+  try {
+    await client.destroy();
+  } catch {}
+
+  try {
+    db.close();
+  } catch {}
+
+  process.exit(0);
+}
+
+process.on('SIGINT', () => shutdown('SIGINT'));
+process.on('SIGTERM', () => shutdown('SIGTERM'));
 
 process.on('unhandledRejection', (reason) => {
   error('Unhandled rejection:', reason?.message || reason);

@@ -57,9 +57,6 @@ export default async function (client, interaction) {
       if (id.startsWith('apply_ticket_')) return handleApplyTicket(client, interaction, id.split('_')[2]);
       if (id.startsWith('apply_accept_')) return handleAccept(client, interaction, id.split('_')[2]);
       if (id.startsWith('apply_reject_')) return handleReject(client, interaction, id.split('_')[2]);
-      if (id.startsWith('apply_ia_')) return handleInstantAccept(client, interaction, id.split('_')[2]);
-      if (id.startsWith('apply_id_')) return handleInstantDeny(client, interaction, id.split('_')[2]);
-      if (id.startsWith('apply_ticket_')) return handleApplyTicket(client, interaction, id.split('_')[2]);
       if (id.startsWith('loa_accept_')) return handleLoaAccept(interaction);
       if (id.startsWith('loa_reject_')) return handleLoaReject(interaction);
     }

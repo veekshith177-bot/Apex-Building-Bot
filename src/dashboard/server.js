@@ -21,8 +21,43 @@ const MIME = {
   '.ico': 'image/x-icon',
 };
 
+function setCommonSecurityHeaders(res) {
+  res.setHeader('X-Content-Type-Options', 'nosniff');
+  res.setHeader('Referrer-Policy', 'no-referrer');
+  res.setHeader('X-Frame-Options', 'DENY');
+  res.setHeader('Cross-Origin-Resource-Policy', 'same-origin');
+  res.setHeader('Cross-Origin-Opener-Policy', 'same-origin');
+
+  // Minimal CSP for the current single-file dashboard (Chart.js + Google fonts via CDN).
+  // If you later inline more scripts/styles or add new CDNs, update this.
+  res.setHeader(
+    'Content-Security-Policy',
+    [
+      "default-src 'self'",
+      "base-uri 'self'",
+      "frame-ancestors 'none'",
+      "img-src 'self' data:",
+      "connect-src 'self'",
+      "font-src 'self' https://fonts.gstatic.com data:",
+      "style-src 'self' 'unsafe-inline' https://fonts.googleapis.com",
+      "script-src 'self' 'unsafe-inline' https://cdn.jsdelivr.net",
+    ].join('; ')
+  );
+}
+
+function maybeSetCors(res) {
+  const origin = String(process.env.DASHBOARD_CORS_ORIGIN || '').trim();
+  if (!origin) return;
+  res.setHeader('Access-Control-Allow-Origin', origin);
+  res.setHeader('Vary', 'Origin');
+}
+
 function sendJson(res, data, status = 200) {
-  res.writeHead(status, { 'Content-Type': 'application/json', 'Access-Control-Allow-Origin': '*' });
+  res.statusCode = status;
+  setCommonSecurityHeaders(res);
+  maybeSetCors(res);
+  res.setHeader('Content-Type', 'application/json; charset=utf-8');
+  res.setHeader('Cache-Control', 'no-store');
   res.end(JSON.stringify(data));
 }
 
@@ -65,10 +100,10 @@ function requireDashboardAuth(req, res, authCfg) {
   const okPass = safeEqual(creds?.password ?? '', authCfg.password);
   if (okUser && okPass) return true;
 
-  res.writeHead(401, {
-    'Content-Type': 'text/plain; charset=utf-8',
-    'WWW-Authenticate': 'Basic realm=\"Apex Dashboard\", charset=\"UTF-8\"',
-  });
+  res.statusCode = 401;
+  setCommonSecurityHeaders(res);
+  res.setHeader('Content-Type', 'text/plain; charset=utf-8');
+  res.setHeader('WWW-Authenticate', 'Basic realm="Apex Dashboard", charset="UTF-8"');
   res.end('Unauthorized');
   return false;
 }
@@ -287,7 +322,9 @@ function serveStatic(pathname, res) {
   if (!fs.existsSync(filePath) || fs.statSync(filePath).isDirectory()) {
     filePath = path.join(publicDir, 'index.html');
     if (!fs.existsSync(filePath)) {
-      res.writeHead(404, { 'Content-Type': 'text/plain' });
+      res.statusCode = 404;
+      setCommonSecurityHeaders(res);
+      res.setHeader('Content-Type', 'text/plain; charset=utf-8');
       res.end('Not Found');
       return;
     }
@@ -296,7 +333,9 @@ function serveStatic(pathname, res) {
   const ext = path.extname(filePath).toLowerCase();
   const contentType = MIME[ext] || 'application/octet-stream';
   const content = fs.readFileSync(filePath);
-  res.writeHead(200, { 'Content-Type': contentType });
+  res.statusCode = 200;
+  setCommonSecurityHeaders(res);
+  res.setHeader('Content-Type', contentType);
   res.end(content);
 }
 
