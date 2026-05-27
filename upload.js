@@ -34,7 +34,7 @@ function findFiles(dir, base = '') {
     const rel = base ? `${base}/${entry.name}` : entry.name;
     if (entry.isDirectory() && entry.name !== 'node_modules' && entry.name !== 'data') {
       results.push(...findFiles(full, rel));
-    } else if (entry.isFile() && entry.name.endsWith('.js')) {
+    } else if (entry.isFile() && (entry.name.endsWith('.js') || entry.name.endsWith('.html') || entry.name.endsWith('.css'))) {
       results.push(rel);
     }
   }

@@ -1,0 +1,562 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Apex Bot Dashboard</title>
+<link href="https://fonts.googleapis.com/icon?family=Material+Icons" rel="stylesheet">
+<script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.7/dist/chart.umd.min.js"></script>
+<style>
+:root {
+  --bg: #0b0e14;
+  --surface: #11161e;
+  --card: #181e28;
+  --card-hover: #1e2632;
+  --border: #262d3a;
+  --text: #e2e8f0;
+  --muted: #7a8494;
+  --primary: #6366f1;
+  --primary-glow: rgba(99,102,241,0.15);
+  --green: #22c55e;
+  --green-bg: rgba(34,197,94,0.12);
+  --yellow: #f59e0b;
+  --yellow-bg: rgba(245,158,11,0.12);
+  --red: #ef4444;
+  --red-bg: rgba(239,68,68,0.12);
+  --purple: #a78bfa;
+  --purple-bg: rgba(167,139,250,0.12);
+  --cyan: #22d3ee;
+  --cyan-bg: rgba(34,211,238,0.12);
+  --orange: #f97316;
+  --orange-bg: rgba(249,115,22,0.12);
+  --radius: 10px;
+  --sidebar: 220px;
+}
+*,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
+body{
+  font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,sans-serif;
+  background:var(--bg);color:var(--text);display:flex;min-height:100vh;
+}
+/* ── Sidebar ── */
+.sidebar{
+  width:var(--sidebar);background:var(--surface);border-right:1px solid var(--border);
+  display:flex;flex-direction:column;position:fixed;top:0;left:0;bottom:0;z-index:50;
+  overflow-y:auto;
+}
+.sidebar-logo{padding:20px 16px;border-bottom:1px solid var(--border);font-size:18px;font-weight:700;display:flex;align-items:center;gap:10px}
+.sidebar-logo .material-icons{color:var(--primary);font-size:24px}
+.sidebar-nav{padding:12px 8px;flex:1}
+.nav-section{font-size:10px;text-transform:uppercase;letter-spacing:1px;color:var(--muted);padding:16px 12px 6px}
+.nav-item{
+  display:flex;align-items:center;gap:10px;padding:10px 12px;border-radius:8px;
+  cursor:pointer;color:var(--muted);font-size:14px;transition:all .15s;user-select:none;
+}
+.nav-item:hover{background:var(--card);color:var(--text)}
+.nav-item.active{background:var(--primary-glow);color:var(--primary)}
+.nav-item .material-icons{font-size:18px}
+.sidebar-footer{padding:12px 16px;border-top:1px solid var(--border);font-size:12px;color:var(--muted)}
+/* ── Main ── */
+.main{margin-left:var(--sidebar);flex:1;padding:24px 32px;max-width:calc(100vw - var(--sidebar))}
+.main-header{display:flex;align-items:center;justify-content:space-between;margin-bottom:24px}
+.main-header h2{font-size:22px;font-weight:600}
+.main-header .update-time{font-size:13px;color:var(--muted)}
+/* ── Page toggle ── */
+.page{display:none}
+.page.active{display:block}
+/* ── Cards ── */
+.stats-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(200px,1fr));gap:14px;margin-bottom:24px}
+.stat-card{
+  background:var(--card);border:1px solid var(--border);border-radius:var(--radius);
+  padding:18px;transition:all .2s;cursor:default;
+}
+.stat-card:hover{background:var(--card-hover);border-color:var(--primary);transform:translateY(-1px)}
+.stat-card .top{display:flex;align-items:center;justify-content:space-between;margin-bottom:6px}
+.stat-card .icon{width:36px;height:36px;border-radius:8px;display:flex;align-items:center;justify-content:center}
+.stat-card .icon .material-icons{font-size:18px}
+.stat-card .label{font-size:12px;color:var(--muted);text-transform:uppercase;letter-spacing:.4px}
+.stat-card .value{font-size:26px;font-weight:700}
+.stat-card .sub{font-size:12px;color:var(--muted);margin-top:2px}
+/* ── Panels ── */
+.panel{background:var(--card);border:1px solid var(--border);border-radius:var(--radius);padding:20px;margin-bottom:18px}
+.panel-title{font-size:15px;font-weight:600;margin-bottom:14px;display:flex;align-items:center;gap:8px}
+.panel-title .material-icons{font-size:18px;color:var(--muted)}
+.chart-wrap{position:relative;height:260px}
+.two-col{display:grid;grid-template-columns:1fr 1fr;gap:18px;margin-bottom:18px}
+@media(max-width:1000px){.two-col{grid-template-columns:1fr}}
+/* ── Tables ── */
+.table-wrap{overflow-x:auto}
+table{width:100%;border-collapse:collapse;font-size:13px}
+th{text-align:left;padding:10px 12px;color:var(--muted);font-weight:500;font-size:11px;text-transform:uppercase;letter-spacing:.5px;border-bottom:1px solid var(--border);white-space:nowrap}
+td{padding:9px 12px;border-bottom:1px solid var(--border);white-space:nowrap}
+tr:last-child td{border-bottom:none}
+tr:hover td{background:rgba(255,255,255,.02)}
+.badge{
+  display:inline-flex;align-items:center;gap:4px;padding:2px 8px;border-radius:10px;
+  font-size:11px;font-weight:600;text-transform:capitalize;
+}
+.badge.open{background:var(--primary-glow);color:var(--primary)}
+.badge.closed{background:var(--green-bg);color:var(--green)}
+.badge.claimed{background:var(--purple-bg);color:var(--purple)}
+.badge.warn{background:var(--yellow-bg);color:var(--yellow)}
+.badge.mute,.badge.ban,.badge.tempban,.badge.kick,.badge.softban{background:var(--red-bg);color:var(--red)}
+.badge.unmute,.badge.unban{background:var(--green-bg);color:var(--green)}
+.badge.pending{background:var(--yellow-bg);color:var(--yellow)}
+.badge.approved{background:var(--green-bg);color:var(--green)}
+.badge.rejected{background:var(--red-bg);color:var(--red)}
+.mono{font-family:ui-monospace,SFMono-Regular,Menlo,monospace;font-size:12px}
+.clickable{cursor:pointer}
+.clickable:hover{color:var(--primary)}
+/* ── Search / Filters ── */
+.toolbar{display:flex;gap:10px;margin-bottom:14px;flex-wrap:wrap;align-items:center}
+.toolbar input,.toolbar select{
+  background:var(--surface);border:1px solid var(--border);border-radius:6px;
+  color:var(--text);padding:8px 12px;font-size:13px;outline:none;
+}
+.toolbar input:focus,.toolbar select:focus{border-color:var(--primary)}
+.toolbar input{flex:1;min-width:160px}
+.toolbar select{min-width:120px}
+.pagination{display:flex;align-items:center;gap:8px;margin-top:12px;font-size:13px}
+.pagination button{
+  background:var(--surface);border:1px solid var(--border);border-radius:6px;
+  color:var(--text);padding:6px 12px;cursor:pointer;font-size:13px;
+}
+.pagination button:hover{background:var(--card)}
+.pagination button:disabled{opacity:.4;cursor:default}
+.pagination span{color:var(--muted)}
+/* ── Modal (ticket detail) ── */
+.modal-overlay{display:none;position:fixed;inset:0;background:rgba(0,0,0,.6);z-index:100;align-items:center;justify-content:center}
+.modal-overlay.open{display:flex}
+.modal{background:var(--card);border:1px solid var(--border);border-radius:12px;width:90%;max-width:700px;max-height:80vh;overflow-y:auto;padding:24px}
+.modal h3{font-size:17px;margin-bottom:16px;display:flex;align-items:center;justify-content:space-between}
+.modal .close-btn{background:none;border:none;color:var(--muted);cursor:pointer;font-size:20px}
+.modal .close-btn:hover{color:var(--text)}
+.modal .field{margin-bottom:10px}
+.modal .field .label{font-size:11px;color:var(--muted);text-transform:uppercase;letter-spacing:.5px}
+.modal .field .val{font-size:13px;margin-top:2px}
+.modal pre{background:var(--surface);border:1px solid var(--border);border-radius:6px;padding:10px;font-size:12px;overflow-x:auto;margin-top:6px}
+.modal .note-item{padding:8px 0;border-bottom:1px solid var(--border)}
+.modal .note-item:last-child{border-bottom:none}
+/* ── Empty state ── */
+.empty{text-align:center;padding:40px;color:var(--muted)}
+.empty .material-icons{font-size:40px;margin-bottom:8px;opacity:.5}
+/* ── Loading ── */
+.loading{text-align:center;padding:30px;color:var(--muted)}
+.spin{animation:spin 1s linear infinite}
+@keyframes spin{to{transform:rotate(360deg)}}
+</style>
+</head>
+<body>
+
+<aside class="sidebar">
+  <div class="sidebar-logo"><span class="material-icons">dashboard</span> Apex Bot</div>
+  <nav class="sidebar-nav">
+    <div class="nav-section">Main</div>
+    <div class="nav-item active" data-page="overview"><span class="material-icons">home</span> Overview</div>
+    <div class="nav-item" data-page="tickets"><span class="material-icons">confirmation_number</span> Tickets</div>
+    <div class="nav-item" data-page="moderation"><span class="material-icons">gavel</span> Moderation</div>
+    <div class="nav-section">Community</div>
+    <div class="nav-item" data-page="staff"><span class="material-icons">people</span> Staff Activity</div>
+    <div class="nav-item" data-page="giveaways"><span class="material-icons">card_giftcard</span> Giveaways</div>
+    <div class="nav-item" data-page="ratings"><span class="material-icons">star</span> Reputation</div>
+    <div class="nav-section">Management</div>
+    <div class="nav-item" data-page="blacklist"><span class="material-icons">block</span> Blacklist</div>
+    <div class="nav-item" data-page="applications"><span class="material-icons">description</span> Applications</div>
+    <div class="nav-item" data-page="loa"><span class="material-icons">beach_access</span> Leave of Absence</div>
+  </nav>
+  <div class="sidebar-footer" id="footerInfo">Loading...</div>
+</aside>
+
+<main class="main">
+  <div class="main-header">
+    <h2 id="pageTitle">Overview</h2>
+    <span class="update-time" id="updateTime"></span>
+  </div>
+
+  <!-- ════ OVERVIEW ════ -->
+  <div class="page active" id="page-overview">
+    <div class="stats-grid" id="statsGrid"></div>
+    <div class="two-col">
+      <div class="panel"><div class="panel-title"><span class="material-icons">trending_up</span> Tickets Per Day (14 days)</div><div class="chart-wrap"><canvas id="chartDaily"></canvas></div></div>
+      <div class="panel"><div class="panel-title"><span class="material-icons">pie_chart</span> Tickets by Type</div><div class="chart-wrap"><canvas id="chartType"></canvas></div></div>
+    </div>
+    <div class="two-col">
+      <div class="panel">
+        <div class="panel-title"><span class="material-icons">schedule</span> Recent Tickets</div>
+        <div class="table-wrap"><table><thead><tr><th>ID</th><th>User</th><th>Type</th><th>Status</th><th>Created</th></tr></thead><tbody id="recentTickets"></tbody></table></div>
+      </div>
+      <div class="panel">
+        <div class="panel-title"><span class="material-icons">warning</span> Recent Mod Actions</div>
+        <div class="table-wrap"><table><thead><tr><th>Case</th><th>Action</th><th>Mod</th><th>Date</th></tr></thead><tbody id="recentMods"></tbody></table></div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ════ TICKETS ════ -->
+  <div class="page" id="page-tickets">
+    <div class="toolbar">
+      <input type="text" id="ticketSearch" placeholder="Search by user ID or channel..." oninput="searchTickets()">
+      <select id="ticketStatusFilter" onchange="searchTickets()"><option value="all">All Status</option><option value="open">Open</option><option value="closed">Closed</option></select>
+      <select id="ticketTypeFilter" onchange="searchTickets()"><option value="all">All Types</option></select>
+    </div>
+    <div class="panel">
+      <div class="table-wrap"><table><thead><tr><th>ID</th><th>User</th><th>Type</th><th>Status</th><th>Claimed</th><th>Created</th></tr></thead><tbody id="ticketList"></tbody></table></div>
+      <div class="pagination" id="ticketPagination"></div>
+    </div>
+  </div>
+
+  <!-- ════ MODERATION ════ -->
+  <div class="page" id="page-moderation">
+    <div class="stats-grid" id="modStats"></div>
+    <div class="two-col">
+      <div class="panel"><div class="panel-title"><span class="material-icons">history</span> Recent Actions</div><div class="table-wrap"><table><thead><tr><th>#</th><th>Action</th><th>Mod</th><th>Target</th><th>Date</th></tr></thead><tbody id="modActionList"></tbody></table></div></div>
+      <div class="panel"><div class="panel-title"><span class="material-icons">priority_high</span> Most Warned Users</div><div class="table-wrap"><table><thead><tr><th>#</th><th>User</th><th>Warnings</th></tr></thead><tbody id="warnTopList"></tbody></table></div></div>
+    </div>
+    <div class="two-col">
+      <div class="panel"><div class="panel-title"><span class="material-icons">volume_off</span> Active Mutes</div><div class="table-wrap"><table><thead><tr><th>User</th><th>Reason</th><th>Expires</th></tr></thead><tbody id="muteList"></tbody></table></div></div>
+      <div class="panel"><div class="panel-title"><span class="material-icons">gavel</span> Active Tempbans</div><div class="table-wrap"><table><thead><tr><th>User</th><th>Reason</th><th>Expires</th></tr></thead><tbody id="banList"></tbody></table></div></div>
+    </div>
+  </div>
+
+  <!-- ════ STAFF ════ -->
+  <div class="page" id="page-staff">
+    <div class="panel"><div class="panel-title"><span class="material-icons">emoji_events</span> Top Claimers</div><div class="table-wrap"><table><thead><tr><th>#</th><th>Staff</th><th>Tickets Claimed</th><th>Unique Users</th></tr></thead><tbody id="staffClaimList"></tbody></table></div></div>
+    <div class="panel"><div class="panel-title"><span class="material-icons">track_changes</span> Staff Action Breakdown</div><div class="table-wrap"><table><thead><tr><th>Staff</th><th>Action</th><th>Count</th></tr></thead><tbody id="staffActionList"></tbody></table></div></div>
+  </div>
+
+  <!-- ════ GIVEAWAYS ════ -->
+  <div class="page" id="page-giveaways">
+    <div class="two-col">
+      <div class="panel"><div class="panel-title"><span class="material-icons">play_circle</span> Active Giveaways</div><div class="table-wrap"><table><thead><tr><th>Prize</th><th>Host</th><th>Entries</th><th>Ends</th></tr></thead><tbody id="activeGiveawayList"></tbody></table></div></div>
+      <div class="panel"><div class="panel-title"><span class="material-icons">history</span> Ended Giveaways</div><div class="table-wrap"><table><thead><tr><th>Prize</th><th>Host</th><th>Entries</th><th>Ended</th></tr></thead><tbody id="endedGiveawayList"></tbody></table></div></div>
+    </div>
+  </div>
+
+  <!-- ════ RATINGS ════ -->
+  <div class="page" id="page-ratings">
+    <div class="stats-grid" id="ratingStats"></div>
+    <div class="panel"><div class="panel-title"><span class="material-icons">leaderboard</span> Reputation Leaderboard</div><div class="table-wrap"><table><thead><tr><th>#</th><th>User</th><th>Avg Stars</th><th>Ratings</th></tr></thead><tbody id="ratingLeaderboard"></tbody></table></div></div>
+  </div>
+
+  <!-- ════ BLACKLIST ════ -->
+  <div class="page" id="page-blacklist">
+    <div class="panel"><div class="panel-title"><span class="material-icons">block</span> Blacklisted Users</div><div class="table-wrap"><table><thead><tr><th>User ID</th><th>Reason</th><th>Added By</th><th>Date</th></tr></thead><tbody id="blacklistList"></tbody></table></div></div>
+  </div>
+
+  <!-- ════ APPLICATIONS ════ -->
+  <div class="page" id="page-applications">
+    <div class="panel"><div class="panel-title"><span class="material-icons">pending</span> Pending Applications</div><div class="table-wrap"><table><thead><tr><th>ID</th><th>User</th><th>Type</th><th>Submitted</th></tr></thead><tbody id="appList"></tbody></table></div></div>
+  </div>
+
+  <!-- ════ LOA ════ -->
+  <div class="page" id="page-loa">
+    <div class="panel"><div class="panel-title"><span class="material-icons">beach_access</span> Active Leaves of Absence</div><div class="table-wrap"><table><thead><tr><th>User</th><th>End Date</th><th>Created</th></tr></thead><tbody id="loaList"></tbody></table></div></div>
+  </div>
+</main>
+
+<!-- Modal -->
+<div class="modal-overlay" id="ticketModal">
+  <div class="modal">
+    <h3>Ticket Details <button class="close-btn" onclick="closeTicketModal()">&times;</button></h3>
+    <div id="ticketModalContent"></div>
+  </div>
+</div>
+
+<script>
+const API='/api';
+let chartDaily=null, chartType=null;
+
+function tid(id){return id&&id.length>12?id.slice(0,6)+'…'+id.slice(-4):id||'—'}
+function fmt(d){return d?new Date(d+'Z').toLocaleString():'—'}
+function fmtShort(d){return d?new Date(d+'Z').toLocaleDateString():'—'}
+function esc(s){const d=document.createElement('div');d.textContent=s;return d.innerHTML}
+
+// ── Navigation ──
+document.querySelectorAll('.nav-item').forEach(el=>{
+  el.addEventListener('click',()=>{
+    document.querySelectorAll('.nav-item').forEach(n=>n.classList.remove('active'));
+    el.classList.add('active');
+    document.querySelectorAll('.page').forEach(p=>p.classList.remove('active'));
+    document.getElementById('page-'+el.dataset.page).classList.add('active');
+    document.getElementById('pageTitle').textContent=el.textContent.trim();
+    loadPage(el.dataset.page);
+  });
+});
+
+function loadPage(name){
+  switch(name){
+    case 'overview':loadOverview();break;
+    case 'tickets':loadTicketTypes();searchTickets();break;
+    case 'moderation':loadModeration();break;
+    case 'staff':loadStaff();break;
+    case 'giveaways':loadGiveaways();break;
+    case 'ratings':loadRatings();break;
+    case 'blacklist':loadBlacklist();break;
+    case 'applications':loadApplications();break;
+    case 'loa':loadLoa();break;
+  }
+}
+
+// ── API helper ──
+async function api(path){
+  const r=await fetch(API+path);
+  if(!r.ok)throw new Error(await r.text());
+  return r.json();
+}
+
+// ── Overview ──
+async function loadOverview(){
+  const s=await api('/stats');
+  document.getElementById('updateTime').textContent='Updated: '+new Date().toLocaleString();
+
+  const ICONS={
+    total:['confirmation_number','',0], open:['lock_open','var(--primary)',0], closed:['check_circle','var(--green)',0],
+    today:['today','var(--cyan)',0], avgRating:['star','var(--yellow)',0], activeGiveaways:['card_giftcard','var(--purple)',0],
+    activeMutes:['volume_off','var(--red)',0], pendingApps:['description','var(--orange)',0], blacklisted:['block','var(--red)',0],
+    totalModActions:['gavel','var(--muted)',0],
+  };
+  const STATS=[
+    {key:'total',label:'Total Tickets',val:s.total},
+    {key:'open',label:'Open',val:s.open},
+    {key:'closed',label:'Closed',val:s.closed},
+    {key:'today',label:'Created Today',val:s.today,sub:s.todayClosed+' closed today'},
+    {key:'avgRating',label:'Avg Rating',val:s.avgRating+'★',sub:s.totalRatings+' ratings'},
+    {key:'activeGiveaways',label:'Active Giveaways',val:s.activeGiveaways},
+    {key:'activeMutes',label:'Active Mutes',val:s.activeMutes},
+    {key:'pendingApps',label:'Pending Apps',val:s.pendingApps},
+    {key:'blacklisted',label:'Blacklisted',val:s.blacklisted},
+    {key:'totalModActions',label:'Mod Actions',val:s.totalModActions},
+  ];
+  document.getElementById('statsGrid').innerHTML=STATS.map(st=>{
+    const ic=ICONS[st.key]||['circle','var(--muted)',0];
+    return `<div class="stat-card">
+      <div class="top"><span class="label">${st.label}</span><div class="icon" style="background:${ic[1]}15;color:${ic[1]||'var(--muted)'}"><span class="material-icons">${ic[0]}</span></div></div>
+      <div class="value">${st.val}</div>
+      ${st.sub?`<div class="sub">${st.sub}</div>`:''}
+    </div>`;
+  }).join('');
+
+  // Daily chart
+  const daily=await api('/tickets/daily?days=14');
+  const ctx1=document.getElementById('chartDaily').getContext('2d');
+  if(chartDaily)chartDaily.destroy();
+  chartDaily=new Chart(ctx1,{
+    type:'bar',data:{
+      labels:daily.map(r=>r.day.slice(5)),
+      datasets:[{label:'Tickets',data:daily.map(r=>r.count),backgroundColor:'rgba(99,102,241,0.3)',borderColor:'#6366f1',borderWidth:1,borderRadius:4}]
+    },options:{
+      responsive:true,maintainAspectRatio:false,
+      plugins:{legend:{display:false}},
+      scales:{x:{ticks:{color:'#7a8494'},grid:{color:'#1e2632'}},y:{ticks:{color:'#7a8494',stepSize:1},grid:{color:'#1e2632'}}}
+    }
+  });
+
+  // Type chart
+  const types=await api('/tickets/type-stats');
+  const colors=['#6366f1','#22c55e','#f59e0b','#ef4444','#a78bfa','#22d3ee','#f97316'];
+  const ctx2=document.getElementById('chartType').getContext('2d');
+  if(chartType)chartType.destroy();
+  chartType=new Chart(ctx2,{
+    type:'doughnut',data:{
+      labels:types.map(r=>r.type),
+      datasets:[{data:types.map(r=>r.count),backgroundColor:colors.slice(0,types.length),borderWidth:0}]
+    },options:{
+      responsive:true,maintainAspectRatio:false,
+      plugins:{legend:{position:'right',labels:{color:'#e2e8f0',padding:10,usePointStyle:true}}}
+    }
+  });
+
+  // Recent tickets
+  const tickets=await api('/tickets/recent?limit=8');
+  document.getElementById('recentTickets').innerHTML=tickets.length?tickets.map(t=>
+    `<tr class="clickable" onclick="openTicket(${t.id})">
+      <td class="mono">#${t.id}</td><td class="mono">${tid(t.user_id)}</td>
+      <td>${esc(t.type||'—')}</td>
+      <td><span class="badge ${t.status}">${t.status}${t.claimed_by?' (claimed)':''}</span></td>
+      <td>${fmt(t.created_at)}</td>
+    </tr>`
+  ).join(''):'<tr><td colspan="5" class="empty">No tickets yet</td></tr>';
+
+  // Recent mods
+  const mods=await api('/moderation/recent?limit=8');
+  document.getElementById('recentMods').innerHTML=mods.length?mods.map(m=>
+    `<tr><td class="mono">#${m.case_id}</td><td><span class="badge ${m.action}">${m.action}</span></td><td class="mono">${tid(m.moderator_id)}</td><td>${fmt(m.created_at)}</td></tr>`
+  ).join(''):'<tr><td colspan="4" class="empty">No mod actions</td></tr>';
+}
+
+// ── Tickets ──
+let ticketPage=1,ticketTypesLoaded=false;
+async function loadTicketTypes(){
+  if(ticketTypesLoaded)return;
+  try{
+    const types=await api('/tickets/type-stats');
+    const sel=document.getElementById('ticketTypeFilter');
+    sel.innerHTML='<option value="all">All Types</option>'+types.map(t=>`<option value="${esc(t.type)}">${esc(t.type)}</option>`).join('');
+    ticketTypesLoaded=true;
+  }catch(e){}
+}
+
+async function searchTickets(page){
+  page=page||ticketPage;
+  const q=document.getElementById('ticketSearch').value;
+  const status=document.getElementById('ticketStatusFilter').value;
+  const type=document.getElementById('ticketTypeFilter').value;
+  try{
+    const data=await api(`/tickets/search?q=${encodeURIComponent(q)}&status=${status}&type=${type}&page=${page}&limit=20`);
+    const tbody=document.getElementById('ticketList');
+    tbody.innerHTML=data.tickets.length?data.tickets.map(t=>
+      `<tr class="clickable" onclick="openTicket(${t.id})">
+        <td class="mono">#${t.id}</td><td class="mono">${tid(t.user_id)}</td>
+        <td>${esc(t.type||'—')}</td>
+        <td><span class="badge ${t.status}">${t.status}</span></td>
+        <td>${t.claimed_by?tid(t.claimed_by):'—'}</td>
+        <td>${fmt(t.created_at)}</td>
+      </tr>`
+    ).join(''):'<tr><td colspan="6" class="empty">No tickets found</td></tr>';
+    ticketPage=data.page;
+    renderPagination('ticketPagination',data.page,data.pages,searchTickets);
+  }catch(e){}
+}
+
+function renderPagination(id,page,pages,fn){
+  const el=document.getElementById(id);
+  el.innerHTML=`<button onclick="${fn.name}(${page-1})" ${page<=1?'disabled':''}>Prev</button>
+    <span>Page ${page} of ${pages||1}</span>
+    <button onclick="${fn.name}(${page+1})" ${page>=pages?'disabled':''}>Next</button>`;
+}
+
+// ── Ticket Detail Modal ──
+async function openTicket(id){
+  const overlay=document.getElementById('ticketModal');
+  const content=document.getElementById('ticketModalContent');
+  content.innerHTML='<div class="loading"><span class="material-icons spin">refresh</span> Loading...</div>';
+  overlay.classList.add('open');
+  try{
+    const t=await api(`/tickets/${id}`);
+    content.innerHTML=`
+      <div class="two-col" style="grid-template-columns:1fr 1fr;margin-bottom:12px">
+        <div class="field"><div class="label">Ticket ID</div><div class="val mono">#${t.id}</div></div>
+        <div class="field"><div class="label">Status</div><div class="val"><span class="badge ${t.status}">${t.status}</span></div></div>
+        <div class="field"><div class="label">User</div><div class="val mono">${tid(t.user_id)}</div></div>
+        <div class="field"><div class="label">Type</div><div class="val">${esc(t.type||'—')}</div></div>
+        <div class="field"><div class="label">Created</div><div class="val">${fmt(t.created_at)}</div></div>
+        <div class="field"><div class="label">Closed</div><div class="val">${t.closed_at?fmt(t.closed_at):'—'}</div></div>
+        <div class="field"><div class="label">Claimed By</div><div class="val mono">${t.claimed_by?tid(t.claimed_by):'—'}</div></div>
+        <div class="field"><div class="label">Channel</div><div class="val mono">${tid(t.channel_id)}</div></div>
+      </div>
+      ${t.notes&&t.notes.length?`<div class="panel-title" style="margin-top:8px"><span class="material-icons">notes</span> Notes (${t.notes.length})</div>
+        ${t.notes.map(n=>`<div class="note-item"><div class="mono" style="color:var(--muted);font-size:11px">${tid(n.author_id)} · ${fmt(n.created_at)}</div><div style="margin-top:2px;font-size:13px">${esc(n.content)}</div></div>`).join('')}`:''}
+      ${t.actions&&t.actions.length?`<div class="panel-title" style="margin-top:12px"><span class="material-icons">history</span> Actions (${t.actions.length})</div>
+        <div class="table-wrap"><table><thead><tr><th>Action</th><th>Actor</th><th>Details</th><th>Date</th></tr></thead><tbody>
+        ${t.actions.map(a=>`<tr><td>${esc(a.action)}</td><td class="mono">${tid(a.actor_id)}</td><td>${esc(a.details||'')}</td><td>${fmt(a.created_at)}</td></tr>`).join('')}
+        </tbody></table></div>`:''}
+      ${t.ratings&&t.ratings.length?`<div class="panel-title" style="margin-top:12px"><span class="material-icons">star</span> Ratings (${t.ratings.length})</div>
+        ${t.ratings.map(r=>`<div class="note-item">${'★'.repeat(r.stars)}${'☆'.repeat(5-r.stars)} · ${esc(r.feedback||'No feedback')} · ${fmt(r.created_at)}</div>`).join('')}`:''}
+    `;
+  }catch(e){
+    content.innerHTML=`<div class="empty">Failed to load ticket</div>`;
+  }
+}
+function closeTicketModal(){
+  document.getElementById('ticketModal').classList.remove('open');
+}
+document.getElementById('ticketModal').addEventListener('click',e=>{
+  if(e.target===e.currentTarget)closeTicketModal();
+});
+
+// ── Moderation ──
+async function loadModeration(){
+  const s=await api('/stats');
+  document.getElementById('modStats').innerHTML=`
+    <div class="stat-card"><div class="top"><span class="label">Total Warnings</span><div class="icon" style="background:var(--yellow-bg);color:var(--yellow)"><span class="material-icons">warning</span></div></div><div class="value">${s.totalWarnings}</div></div>
+    <div class="stat-card"><div class="top"><span class="label">Active Mutes</span><div class="icon" style="background:var(--red-bg);color:var(--red)"><span class="material-icons">volume_off</span></div></div><div class="value">${s.activeMutes}</div></div>
+    <div class="stat-card"><div class="top"><span class="label">Active Tempbans</span><div class="icon" style="background:var(--red-bg);color:var(--red)"><span class="material-icons">gavel</span></div></div><div class="value">${s.activeBans}</div></div>
+    <div class="stat-card"><div class="top"><span class="label">Total Actions</span><div class="icon" style="background:var(--primary-glow);color:var(--primary)"><span class="material-icons">gavel</span></div></div><div class="value">${s.totalModActions}</div></div>
+  `;
+  const actions=await api('/moderation/recent?limit=15');
+  document.getElementById('modActionList').innerHTML=actions.length?actions.map(a=>
+    `<tr><td class="mono">#${a.case_id}</td><td><span class="badge ${a.action}">${a.action}</span></td><td class="mono">${tid(a.moderator_id)}</td><td class="mono">${tid(a.target_id)}</td><td>${fmt(a.created_at)}</td></tr>`
+  ).join(''):'<tr><td colspan="5" class="empty">No actions</td></tr>';
+
+  const top=await api('/moderation/warnings/top?limit=10');
+  document.getElementById('warnTopList').innerHTML=top.length?top.map((u,i)=>
+    `<tr><td style="color:var(--muted)">#${i+1}</td><td class="mono">${tid(u.user_id)}</td><td style="color:var(--yellow);font-weight:600">${u.count}</td></tr>`
+  ).join(''):'<tr><td colspan="3" class="empty">No warnings</td></tr>';
+
+  const mutes=await api('/moderation/mutes');
+  document.getElementById('muteList').innerHTML=mutes.length?mutes.map(m=>
+    `<tr><td class="mono">${tid(m.user_id)}</td><td>${esc(m.reason||'—')}</td><td>${fmt(m.expires_at)}</td></tr>`
+  ).join(''):'<tr><td colspan="3" class="empty">No active mutes</td></tr>';
+
+  const bans=await api('/moderation/bans');
+  document.getElementById('banList').innerHTML=bans.length?bans.map(b=>
+    `<tr><td class="mono">${tid(b.user_id)}</td><td>${esc(b.reason||'—')}</td><td>${fmt(b.expires_at)}</td></tr>`
+  ).join(''):'<tr><td colspan="3" class="empty">No active bans</td></tr>';
+}
+
+// ── Staff ──
+async function loadStaff(){
+  const data=await api('/staff/activity');
+  document.getElementById('staffClaimList').innerHTML=data.claims.length?data.claims.map((c,i)=>
+    `<tr><td style="color:var(--muted)">#${i+1}</td><td class="mono">${tid(c.claimed_by)}</td><td style="font-weight:600">${c.tickets}</td><td>${c.unique_users}</td></tr>`
+  ).join(''):'<tr><td colspan="4" class="empty">No claims yet</td></tr>';
+  document.getElementById('staffActionList').innerHTML=data.recentStaffActions.length?data.recentStaffActions.map(a=>
+    `<tr><td class="mono">${tid(a.moderator_id)}</td><td><span class="badge ${a.action}">${a.action}</span></td><td style="font-weight:600">${a.count}</td></tr>`
+  ).join(''):'<tr><td colspan="3" class="empty">No actions yet</td></tr>';
+}
+
+// ── Giveaways ──
+async function loadGiveaways(){
+  const active=await api('/giveaways/active');
+  document.getElementById('activeGiveawayList').innerHTML=active.length?active.map(g=>
+    `<tr><td style="font-weight:500">${esc(g.prize)}</td><td class="mono">${tid(g.hosted_by)}</td><td>${g.entrants}</td><td>${fmt(g.ends_at)}</td></tr>`
+  ).join(''):'<tr><td colspan="4" class="empty">No active giveaways</td></tr>';
+
+  const ended=await api('/giveaways/history?limit=10');
+  document.getElementById('endedGiveawayList').innerHTML=ended.length?ended.map(g=>
+    `<tr><td style="font-weight:500">${esc(g.prize)}</td><td class="mono">${tid(g.hosted_by)}</td><td>${g.entrants}</td><td>${fmt(g.ends_at)}</td></tr>`
+  ).join(''):'<tr><td colspan="4" class="empty">No ended giveaways</td></tr>';
+}
+
+// ── Ratings ──
+async function loadRatings(){
+  const s=await api('/stats');
+  const d=await api('/stats/detailed');
+  document.getElementById('ratingStats').innerHTML=`
+    <div class="stat-card"><div class="top"><span class="label">Total Ratings</span><div class="icon" style="background:var(--yellow-bg);color:var(--yellow)"><span class="material-icons">star</span></div></div><div class="value">${s.totalRatings}</div></div>
+    <div class="stat-card"><div class="top"><span class="label">Average Stars</span><div class="icon" style="background:var(--yellow-bg);color:var(--yellow)"><span class="material-icons">stars</span></div></div><div class="value">${s.avgRating}</div></div>
+  `;
+  const lb=await api('/ratings/leaderboard?limit=15');
+  document.getElementById('ratingLeaderboard').innerHTML=lb.length?lb.map((r,i)=>
+    `<tr><td style="color:var(--muted)">#${i+1}</td><td class="mono">${tid(r.target_id)}</td><td style="color:var(--yellow);font-weight:600">${r.avg_stars}★</td><td>${r.ratings}</td></tr>`
+  ).join(''):'<tr><td colspan="4" class="empty">No ratings yet</td></tr>';
+}
+
+// ── Blacklist ──
+async function loadBlacklist(){
+  const rows=await api('/blacklist');
+  document.getElementById('blacklistList').innerHTML=rows.length?rows.map(b=>
+    `<tr><td class="mono">${tid(b.user_id)}</td><td>${esc(b.reason||'—')}</td><td class="mono">${tid(b.added_by)}</td><td>${fmt(b.added_at)}</td></tr>`
+  ).join(''):'<tr><td colspan="4" class="empty">No blacklisted users</td></tr>';
+}
+
+// ── Applications ──
+async function loadApplications(){
+  const rows=await api('/applications/pending');
+  document.getElementById('appList').innerHTML=rows.length?rows.map(a=>
+    `<tr><td class="mono">#${a.id}</td><td class="mono">${tid(a.user_id)}</td><td>${esc(a.type)}</td><td>${fmt(a.created_at)}</td></tr>`
+  ).join(''):'<tr><td colspan="4" class="empty">No pending applications</td></tr>';
+}
+
+// ── LOA ──
+async function loadLoa(){
+  const rows=await api('/loa/active');
+  document.getElementById('loaList').innerHTML=rows.length?rows.map(l=>
+    `<tr><td class="mono">${tid(l.user_id)}</td><td>${fmt(new Date(l.end_at*1000).toISOString())}</td><td>${fmt(l.created_at)}</td></tr>`
+  ).join(''):'<tr><td colspan="3" class="empty">No active leaves</td></tr>';
+}
+
+// ── Init ──
+loadOverview();
+</script>
+</body>
+</html>

@@ -8,3 +8,4 @@ src/data/
 .DS_Store
 dist/
 build/
+error.txt

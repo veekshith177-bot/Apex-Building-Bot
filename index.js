@@ -1,12 +1,16 @@
 import 'dotenv/config';
 import { Client, GatewayIntentBits, Partials, Collection, Options } from 'discord.js';
 import db from './src/database.js';
+import { startDashboard } from './src/dashboard/server.js';
 import { info, warn, error } from './src/logger.js';
 
 if (!process.env.DISCORD_TOKEN) {
   error('DISCORD_TOKEN is missing in .env');
   process.exit(1);
 }
+
+const PORT = parseInt(process.env.DASHBOARD_PORT) || 2024;
+startDashboard(db, PORT);
 
 info(`Starting bot (Node ${process.version})...`);
 

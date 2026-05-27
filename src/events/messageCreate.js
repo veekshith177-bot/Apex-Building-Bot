@@ -202,13 +202,6 @@ async function purgeSpam(message) {
   }
 }
 
-function formatDuration(ms) {
-  if (ms >= 86_400_000) return `${ms / 86_400_000} day(s)`;
-  if (ms >= 3_600_000) return `${ms / 3_600_000} hour(s)`;
-  if (ms >= 60_000) return `${ms / 60_000} minute(s)`;
-  return `${ms / 1000} second(s)`;
-}
-
 function sendWarning(message, violation) {
   const duration = violation.timeoutMs || MUTE_DURATION;
   const desc = violation.action === 'mute'
