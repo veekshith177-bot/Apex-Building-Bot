@@ -1,5 +1,6 @@
 import { EmbedBuilder } from 'discord.js';
 import db from './database.js';
+import { THEME } from './ui/theme.js';
 
 const stmtNextCase = db.prepare('SELECT COALESCE(MAX(case_id), 0) + 1 AS next FROM mod_logs');
 const stmtInsertLog = db.prepare('INSERT INTO mod_logs (case_id, action, moderator_id, target_id, reason) VALUES (?, ?, ?, ?, ?)');
@@ -8,14 +9,14 @@ const stmtStrikeCount = db.prepare('SELECT COUNT(*) as c FROM warnings WHERE use
 const LOG_COLORS = {
   Warn: 0xF39C12,
   Mute: 0xE67E22,
-  Ban: 0xE74C3C,
-  Kick: 0xE74C3C,
-  Softban: 0xF1C40F,
-  Tempban: 0xE74C3C,
-  Purge: 0x3498DB,
+  Ban: THEME.colors.danger,
+  Kick: THEME.colors.danger,
+  Softban: THEME.colors.warn,
+  Tempban: THEME.colors.danger,
+  Purge: THEME.colors.info,
   Slowmode: 0x1ABC9C,
-  Lock: 0x95A5A6,
-  Unlock: 0x2ECC71,
+  Lock: THEME.colors.neutral,
+  Unlock: THEME.colors.success,
 };
 
 const CHANNEL_ACTIONS = ['Purge', 'Slowmode', 'Lock', 'Unlock'];
@@ -77,8 +78,9 @@ export function autoPunish(guild, userId) {
 
 export function buildModEmbed(action, color, description) {
   return new EmbedBuilder()
-    .setColor(color || 0xF1C40F)
-    .setDescription(`**${action}**\n${description}`)
-    .setFooter({ text: 'Moderation' })
+    .setColor(color || THEME.colors.warn)
+    .setTitle(String(action).slice(0, 256))
+    .setDescription(String(description || '').slice(0, 4096))
+    .setFooter({ text: `${THEME.brandName} • Moderation` })
     .setTimestamp();
 }

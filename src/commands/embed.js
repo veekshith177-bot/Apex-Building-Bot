@@ -7,6 +7,7 @@ import {
   MessageFlags,
 } from 'discord.js';
 import { isMod } from '../utils.js';
+import { THEME } from '../ui/theme.js';
 
 function hexToInt(val) {
   if (val == null) return null;
@@ -16,15 +17,26 @@ function hexToInt(val) {
   return n;
 }
 
+function isValidHttpUrl(url) {
+  if (typeof url !== 'string' || url.length > 2048) return false;
+  try {
+    const u = new URL(url);
+    return u.protocol === 'http:' || u.protocol === 'https:';
+  } catch {
+    return false;
+  }
+}
+
 function buildEmbed(data) {
   const embed = new EmbedBuilder();
 
   if (data.title) embed.setTitle(String(data.title).slice(0, 256));
   if (data.description) embed.setDescription(String(data.description).slice(0, 4096));
-  if (data.url) embed.setURL(String(data.url));
+  if (data.url && isValidHttpUrl(String(data.url))) embed.setURL(String(data.url));
 
   const color = typeof data.color === 'string' ? hexToInt(data.color) : data.color;
   if (typeof color === 'number' && color >= 0 && color <= 0xffffff) embed.setColor(color);
+  else embed.setColor(THEME.brandColor);
 
   if (data.timestamp) {
     const ts = new Date(data.timestamp);
@@ -34,25 +46,30 @@ function buildEmbed(data) {
   if (data.author && data.author.name) {
     embed.setAuthor({
       name: String(data.author.name).slice(0, 256),
-      url: data.author.url ? String(data.author.url) : undefined,
-      iconURL: (data.author.icon_url || data.author.iconURL) ? String(data.author.icon_url || data.author.iconURL) : undefined,
+      url: data.author.url && isValidHttpUrl(String(data.author.url)) ? String(data.author.url) : undefined,
+      iconURL: (data.author.icon_url || data.author.iconURL) && isValidHttpUrl(String(data.author.icon_url || data.author.iconURL))
+        ? String(data.author.icon_url || data.author.iconURL)
+        : undefined,
     });
   }
 
   if (data.footer && data.footer.text) {
     embed.setFooter({
       text: String(data.footer.text).slice(0, 2048),
-      iconURL: (data.footer.icon_url || data.footer.iconURL) ? String(data.footer.icon_url || data.footer.iconURL) : undefined,
+      iconURL: (data.footer.icon_url || data.footer.iconURL) && isValidHttpUrl(String(data.footer.icon_url || data.footer.iconURL))
+        ? String(data.footer.icon_url || data.footer.iconURL)
+        : undefined,
     });
   }
 
   if (data.image) {
     const url = data.image.url || data.image;
-    if (typeof url === 'string') embed.setImage(url);
+    if (typeof url === 'string' && isValidHttpUrl(url)) embed.setImage(url);
   }
 
-  if (data.thumbnail && data.thumbnail.url) {
-    embed.setThumbnail(data.thumbnail.url);
+  if (data.thumbnail) {
+    const url = data.thumbnail.url || data.thumbnail;
+    if (typeof url === 'string' && isValidHttpUrl(url)) embed.setThumbnail(url);
   }
 
   if (Array.isArray(data.fields)) {

@@ -26,6 +26,7 @@ import reactionroleCmd from '../commands/reactionrole.js';
 import helpCmd from '../commands/help.js';
 import userinfoCmd from '../commands/userinfo.js';
 import serverinfoCmd from '../commands/serverinfo.js';
+import healthCmd from '../commands/health.js';
 import applypanelCmd from '../commands/applypanel.js';
 import embedCmd from '../commands/embed.js';
 import calcCmd from '../commands/calc.js';
@@ -78,6 +79,7 @@ export default function (client) {
   client.commands.set('help', helpCmd);
   client.commands.set('userinfo', userinfoCmd);
   client.commands.set('serverinfo', serverinfoCmd);
+  client.commands.set('health', healthCmd);
   client.commands.set('applypanel', applypanelCmd);
   client.commands.set('embed', embedCmd);
   client.commands.set('calc', calcCmd);

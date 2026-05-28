@@ -1,13 +1,19 @@
 import { EmbedBuilder, ActionRowBuilder, ButtonBuilder, ButtonStyle } from 'discord.js';
 import db from '../database.js';
+import { error as logError } from '../logger.js';
+import { THEME } from '../ui/theme.js';
+
+const stmtActiveConfig = db.prepare('SELECT * FROM daily_config WHERE id = 1 AND active = 1');
+const stmtAnyActiveDaily = db.prepare("SELECT id FROM giveaways WHERE mode = 'daily' AND ended = 0");
+const stmtInsertDaily = db.prepare('INSERT INTO giveaways (message_id, channel_id, prize, winners, ends_at, hosted_by, mode) VALUES (?, ?, ?, ?, ?, ?, ?)');
 
 export default function (client) {
   setInterval(async () => {
     try {
-      const config = db.prepare('SELECT * FROM daily_config WHERE id = 1 AND active = 1').get();
+      const config = stmtActiveConfig.get();
       if (!config) return;
 
-      const active = db.prepare("SELECT id FROM giveaways WHERE mode = 'daily' AND ended = 0").get();
+      const active = stmtAnyActiveDaily.get();
       if (active) return;
 
       const channel = await client.channels.fetch(config.channel_id).catch(() => null);
@@ -17,7 +23,7 @@ export default function (client) {
       const endsAt = new Date(Date.now() + 86_400_000);
 
       const embed = new EmbedBuilder()
-        .setColor(0xF1C40F)
+        .setColor(THEME.colors.warn)
         .setTitle('🎉 Daily Giveaway')
         .setDescription([
           `**Prize:** ${prize}`,
@@ -40,10 +46,9 @@ export default function (client) {
       const content = pingRole ? `<@&${pingRole}>` : '';
       const msg = await channel.send({ content, embeds: [embed], components: [row], allowedMentions: { parse: ['roles'] } });
 
-      db.prepare('INSERT INTO giveaways (message_id, channel_id, prize, winners, ends_at, hosted_by, mode) VALUES (?, ?, ?, ?, ?, ?, ?)')
-        .run(msg.id, channel.id, prize, 2, endsAt.toISOString(), client.user.id, 'daily');
+      stmtInsertDaily.run(msg.id, channel.id, prize, 2, endsAt.toISOString(), client.user.id, 'daily');
     } catch (e) {
-      console.error('Daily scheduler error:', e.message);
+      logError('Daily scheduler error:', e.message);
     }
   }, 60_000);
 }

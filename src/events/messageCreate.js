@@ -19,6 +19,7 @@ const stmtInsertWarning = db.prepare('INSERT INTO warnings (user_id, moderator_i
 const stmtAfkGet = db.prepare('SELECT * FROM afk WHERE user_id = ?');
 const stmtAfkDelete = db.prepare('DELETE FROM afk WHERE user_id = ?');
 const stmtPatterns = db.prepare('SELECT pattern FROM filtered_words');
+const stmtOpenTicketChannels = db.prepare("SELECT channel_id FROM tickets WHERE status = 'open'");
 
 let ticketChannelCache = null;
 let ticketCacheTime = 0;
@@ -47,7 +48,7 @@ function getPatterns() {
 }
 
 function refreshTicketCache() {
-  const rows = db.prepare("SELECT channel_id FROM tickets WHERE status = 'open'").all();
+  const rows = stmtOpenTicketChannels.all();
   ticketChannelCache = new Set(rows.map(r => r.channel_id));
   ticketCacheTime = Date.now();
 }

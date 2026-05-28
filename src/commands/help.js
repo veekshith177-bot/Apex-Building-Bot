@@ -71,6 +71,7 @@ const CATEGORIES = [
       { cmd: '/applypanel', desc: 'Send the application menu' },
       { cmd: '/embed builder', desc: 'Open the embed builder modal' },
       { cmd: '/embed json', desc: 'Create an embed from raw JSON' },
+      { cmd: '/health', desc: 'Check bot configuration and permissions' },
       { cmd: '/userinfo', desc: 'View information about a user' },
       { cmd: '/serverinfo', desc: 'View information about this server' },
       { cmd: '/calc <expression>', desc: 'Evaluate a math expression' },

@@ -1,6 +1,11 @@
 import { EmbedBuilder, MessageFlags } from 'discord.js';
 import db from '../database.js';
 import { isMod } from '../utils.js';
+import { THEME } from '../ui/theme.js';
+
+const stmtUpsertBlacklist = db.prepare('INSERT OR REPLACE INTO blacklist (user_id, reason, added_by) VALUES (?, ?, ?)');
+const stmtDeleteBlacklist = db.prepare('DELETE FROM blacklist WHERE user_id = ?');
+const stmtListBlacklist = db.prepare('SELECT * FROM blacklist ORDER BY added_at DESC');
 
 function getRoleId() {
   return process.env.BLACKLIST_ROLE_ID;
@@ -39,23 +44,37 @@ export default {
     if (sub === 'add') {
       const user = interaction.options.getUser('user');
       const reason = interaction.options.getString('reason');
-      db.prepare('INSERT OR REPLACE INTO blacklist (user_id, reason, added_by) VALUES (?, ?, ?)').run(user.id, reason, interaction.member.id);
+      stmtUpsertBlacklist.run(user.id, reason, interaction.member.id);
       await assignRole(interaction, user.id);
-      const embed = new EmbedBuilder().setColor(0xF1C40F).setTitle('User Blacklisted').setDescription(`${user.tag} has been blacklisted from tickets and giveaways.`).setTimestamp();
+      const embed = new EmbedBuilder()
+        .setColor(THEME.colors.warn)
+        .setAuthor({ name: THEME.brandName, iconURL: interaction.guild.iconURL({ size: 64 }) || undefined })
+        .setTitle('User Blacklisted')
+        .setDescription(`${user.tag} has been blacklisted from tickets and giveaways.`)
+        .setTimestamp();
       return interaction.reply({ embeds: [embed] });
     }
 
     if (sub === 'remove') {
       const user = interaction.options.getUser('user');
-      db.prepare('DELETE FROM blacklist WHERE user_id = ?').run(user.id);
+      stmtDeleteBlacklist.run(user.id);
       await removeRole(interaction, user.id);
-      const embed = new EmbedBuilder().setColor(0xF1C40F).setTitle('User Unblacklisted').setDescription(`${user.tag} can now create tickets and join giveaways again.`);
+      const embed = new EmbedBuilder()
+        .setColor(THEME.colors.success)
+        .setAuthor({ name: THEME.brandName, iconURL: interaction.guild.iconURL({ size: 64 }) || undefined })
+        .setTitle('User Unblacklisted')
+        .setDescription(`${user.tag} can now create tickets and join giveaways again.`)
+        .setTimestamp();
       return interaction.reply({ embeds: [embed] });
     }
 
     if (sub === 'list') {
-      const rows = db.prepare('SELECT * FROM blacklist ORDER BY added_at DESC').all();
-      const embed = new EmbedBuilder().setColor(0xF1C40F).setTitle('Blacklisted Users');
+      const rows = stmtListBlacklist.all();
+      const embed = new EmbedBuilder()
+        .setColor(THEME.colors.warn)
+        .setAuthor({ name: THEME.brandName, iconURL: interaction.guild.iconURL({ size: 64 }) || undefined })
+        .setTitle('Blacklisted Users')
+        .setTimestamp();
       if (!rows.length) {
         embed.setDescription('No blacklisted users.\nUse `/blacklist add <user>` to block someone from tickets and giveaways.');
       } else {

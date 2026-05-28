@@ -2,6 +2,9 @@ import { EmbedBuilder, MessageFlags } from 'discord.js';
 import db from '../database.js';
 import { isAdmin } from '../utils.js';
 import { logModAction, checkStrikes, autoPunish, buildModEmbed } from '../modutils.js';
+import { THEME } from '../ui/theme.js';
+
+const stmtInsertWarning = db.prepare('INSERT INTO warnings (user_id, moderator_id, reason) VALUES (?, ?, ?)');
 
 export default {
   async execute(interaction) {
@@ -12,8 +15,7 @@ export default {
     const user = interaction.options.getUser('user');
     const reason = interaction.options.getString('reason') || 'No reason specified';
 
-    db.prepare('INSERT INTO warnings (user_id, moderator_id, reason) VALUES (?, ?, ?)')
-      .run(user.id, interaction.member.id, reason);
+    stmtInsertWarning.run(user.id, interaction.member.id, reason);
 
     const strikes = checkStrikes(user.id);
 
@@ -27,7 +29,7 @@ export default {
         `**Reason:** ${reason}`,
         `**Strikes:** ${strikes}`,
       ].join('\n'))
-      .setFooter({ text: 'Moderation' })
+      .setFooter({ text: `${THEME.brandName} • Moderation` })
       .setTimestamp();
     try {
       await user.send({ embeds: [dmEmbed] }).catch(() => {});

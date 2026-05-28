@@ -1,6 +1,14 @@
 import db from '../database.js';
+import {
+  EmbedBuilder,
+  ActionRowBuilder,
+  ButtonBuilder,
+  ButtonStyle,
+  MessageFlags,
+} from 'discord.js';
 import { isStaff, parseDuration } from '../utils.js';
 import { endGiveaway } from '../events/giveawayEnd.js';
+import { THEME } from '../ui/theme.js';
 
 const stmtInsertGiveaway = db.prepare('INSERT INTO giveaways (message_id, channel_id, prize, winners, ends_at, hosted_by, mode, sos_time) VALUES (?, ?, ?, ?, ?, ?, ?, ?)');
 const stmtActiveGiveaway = db.prepare("SELECT * FROM giveaways WHERE message_id = ? AND ended = 0");
@@ -30,6 +38,8 @@ export default {
 };
 
 async function handleCreate(interaction) {
+  await interaction.deferReply({ flags: MessageFlags.Ephemeral });
+
   const prize = interaction.options.getString('prize');
   const durationStr = interaction.options.getString('duration');
   const winners = interaction.options.getInteger('winners');
@@ -39,18 +49,19 @@ async function handleCreate(interaction) {
     : null;
 
   if (mode === 'split-or-steal' && winners !== 2) {
-    return interaction.reply({ content: 'Split or Steal needs exactly 2 winners.', flags: MessageFlags.Ephemeral });
+    return interaction.editReply({ content: 'Split or Steal needs exactly 2 winners.' });
   }
 
   const durationMs = parseDuration(durationStr);
   if (!durationMs) {
-    return interaction.reply({ content: 'Invalid duration. Use format like `1h`, `30m`, `1d` etc.', flags: MessageFlags.Ephemeral });
+    return interaction.editReply({ content: 'Invalid duration. Use format like `1h`, `30m`, `1d` etc.' });
   }
 
   const endsAt = new Date(Date.now() + durationMs);
 
   const embed = new EmbedBuilder()
-    .setColor(0xF1C40F)
+    .setColor(THEME.colors.warn)
+    .setAuthor({ name: THEME.brandName, iconURL: interaction.guild.iconURL({ size: 64 }) || undefined })
     .setTitle(mode === 'split-or-steal' ? '🎲 Split or Steal Giveaway' : '🎉 Giveaway')
     .setDescription([
       `**Prize:** ${prize}`,
@@ -72,14 +83,15 @@ async function handleCreate(interaction) {
 
   const pingRole = process.env.GIVEAWAY_PING_ROLE_ID;
   const content = pingRole ? `<@&${pingRole}>` : '';
-  const msg = await interaction.channel.send({ content, embeds: [embed], components: [row], allowedMentions: { parse: ['users', 'roles'] } });
+  const msg = await interaction.channel.send({ content, embeds: [embed], components: [row], allowedMentions: { parse: ['roles'] } });
 
   stmtInsertGiveaway.run(msg.id, interaction.channel.id, prize, winners, endsAt.toISOString(), interaction.member.id, mode, sosTime);
 
   const createdEmbed = new EmbedBuilder()
-    .setColor(0xF1C40F)
+    .setColor(THEME.colors.success)
+    .setAuthor({ name: THEME.brandName, iconURL: interaction.guild.iconURL({ size: 64 }) || undefined })
     .setDescription(`Giveaway created! ${msg.url}`);
-  await interaction.reply({ embeds: [createdEmbed], flags: MessageFlags.Ephemeral });
+  await interaction.editReply({ embeds: [createdEmbed] });
 }
 
 async function handleEnd(interaction) {

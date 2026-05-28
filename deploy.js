@@ -132,6 +132,7 @@ const commands = [
           o.setName('data').setDescription('Full Discord embed JSON').setRequired(true),
         ),
     ),
+  cmd('health', 'Check bot configuration and permissions'),
   cmd('calc', 'Calculate a math expression')
     .addStringOption(o => o.setName('expression').setDescription('Math expression (e.g. 29x28)').setRequired(true)),
   cmd('afk', 'Set yourself as AFK')
@@ -176,7 +177,7 @@ const countPerCategory = {
   Moderation: 11,
   'Anti-Abuse': 2,
   'Role Management': 2,
-  Utility: 11,
+  Utility: 12,
 };
 
 for (const cat of categories) {

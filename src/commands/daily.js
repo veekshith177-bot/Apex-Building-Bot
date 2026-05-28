@@ -2,6 +2,14 @@ import { EmbedBuilder, ActionRowBuilder, ButtonBuilder, ButtonStyle, MessageFlag
 import db from '../database.js';
 import { isStaff } from '../utils.js';
 import { endGiveaway } from '../events/giveawayEnd.js';
+import { THEME } from '../ui/theme.js';
+
+const stmtGetDailyConfig = db.prepare('SELECT * FROM daily_config WHERE id = 1');
+const stmtInsertDailyGiveaway = db.prepare('INSERT INTO giveaways (message_id, channel_id, prize, winners, ends_at, hosted_by, mode) VALUES (?, ?, ?, ?, ?, ?, ?)');
+const stmtUpdateDailyConfig = db.prepare('UPDATE daily_config SET channel_id = ?, prize = ?, active = 1 WHERE id = 1');
+const stmtInsertDailyConfig = db.prepare('INSERT INTO daily_config (channel_id, prize, active) VALUES (?, ?, 1)');
+const stmtStopDailyConfig = db.prepare('UPDATE daily_config SET active = 0 WHERE id = 1');
+const stmtLatestActiveDaily = db.prepare("SELECT * FROM giveaways WHERE mode = 'daily' AND ended = 0 ORDER BY id DESC LIMIT 1");
 
 export default {
   async execute(interaction) {
@@ -19,7 +27,7 @@ async function handleStart(interaction) {
 
   await interaction.deferReply({ flags: MessageFlags.Ephemeral });
 
-  const existing = db.prepare('SELECT * FROM daily_config WHERE id = 1').get();
+  const existing = stmtGetDailyConfig.get();
   if (existing?.active) {
     return interaction.editReply({ content: 'A daily giveaway is already running.' });
   }
@@ -28,7 +36,8 @@ async function handleStart(interaction) {
   const endsAt = new Date(Date.now() + 86_400_000);
 
   const embed = new EmbedBuilder()
-    .setColor(0xF1C40F)
+    .setColor(THEME.colors.warn)
+    .setAuthor({ name: THEME.brandName, iconURL: interaction.guild.iconURL({ size: 64 }) || undefined })
     .setTitle('🎉 Daily Giveaway')
     .setDescription([
       `**Prize:** ${prize}`,
@@ -51,13 +60,12 @@ async function handleStart(interaction) {
   const content = pingRole ? `<@&${pingRole}>` : '';
   const msg = await interaction.channel.send({ content, embeds: [embed], components: [row], allowedMentions: { parse: ['roles'] } });
 
-  db.prepare('INSERT INTO giveaways (message_id, channel_id, prize, winners, ends_at, hosted_by, mode) VALUES (?, ?, ?, ?, ?, ?, ?)')
-    .run(msg.id, interaction.channel.id, prize, 2, endsAt.toISOString(), interaction.member.id, 'daily');
+  stmtInsertDailyGiveaway.run(msg.id, interaction.channel.id, prize, 2, endsAt.toISOString(), interaction.member.id, 'daily');
 
   if (existing) {
-    db.prepare('UPDATE daily_config SET channel_id = ?, prize = ?, active = 1 WHERE id = 1').run(interaction.channel.id, prize);
+    stmtUpdateDailyConfig.run(interaction.channel.id, prize);
   } else {
-    db.prepare('INSERT INTO daily_config (channel_id, prize, active) VALUES (?, ?, 1)').run(interaction.channel.id, prize);
+    stmtInsertDailyConfig.run(interaction.channel.id, prize);
   }
 
   await interaction.editReply({ content: `Daily giveaway started! Prize: ${prize}. First draw in 24h.` });
@@ -70,14 +78,14 @@ async function handleStop(interaction) {
 
   await interaction.deferReply({ flags: MessageFlags.Ephemeral });
 
-  const config = db.prepare('SELECT * FROM daily_config WHERE id = 1').get();
+  const config = stmtGetDailyConfig.get();
   if (!config?.active) {
     return interaction.editReply({ content: 'No active daily giveaway.' });
   }
 
-  db.prepare('UPDATE daily_config SET active = 0 WHERE id = 1').run();
+  stmtStopDailyConfig.run();
 
-  const active = db.prepare("SELECT * FROM giveaways WHERE mode = 'daily' AND ended = 0 ORDER BY id DESC LIMIT 1").get();
+  const active = stmtLatestActiveDaily.get();
   if (active) {
     const channel = await interaction.client.channels.fetch(active.channel_id).catch(() => null);
     if (channel) {

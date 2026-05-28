@@ -1,7 +1,12 @@
 import { EmbedBuilder, MessageFlags } from 'discord.js';
 import db from '../database.js';
 import { isMod } from '../utils.js';
-import { antipingEnabled, setAntipingEnabled } from '../cache.js';
+import { antipingEnabled, setAntipingEnabled, refreshProtectedPings } from '../cache.js';
+import { THEME } from '../ui/theme.js';
+
+const stmtUpsertProtected = db.prepare('INSERT OR REPLACE INTO protected_pings (target_id, target_type, added_by) VALUES (?, ?, ?)');
+const stmtDeleteProtected = db.prepare('DELETE FROM protected_pings WHERE target_id = ?');
+const stmtListProtected = db.prepare('SELECT * FROM protected_pings ORDER BY added_at DESC');
 
 export default {
   async execute(interaction) {
@@ -17,7 +22,8 @@ export default {
       }
       setAntipingEnabled(db, true);
       const embed = new EmbedBuilder()
-        .setColor(0x2ECC71)
+        .setColor(THEME.colors.success)
+        .setAuthor({ name: THEME.brandName, iconURL: interaction.guild.iconURL({ size: 64 }) || undefined })
         .setTitle('Anti-Ping Enabled')
         .setDescription('The anti-ping system is now **active**. Pinging protected users, roles, @everyone, and staff will be blocked.')
         .setTimestamp();
@@ -30,7 +36,8 @@ export default {
       }
       setAntipingEnabled(db, false);
       const embed = new EmbedBuilder()
-        .setColor(0xE74C3C)
+        .setColor(THEME.colors.danger)
+        .setAuthor({ name: THEME.brandName, iconURL: interaction.guild.iconURL({ size: 64 }) || undefined })
         .setTitle('Anti-Ping Disabled')
         .setDescription('The anti-ping system is now **disabled**. Pings will no longer be blocked.')
         .setTimestamp();
@@ -44,10 +51,12 @@ export default {
       const type = user ? 'user' : 'role';
       if (!target) return interaction.reply({ content: 'Specify a user or role.', flags: MessageFlags.Ephemeral });
 
-      db.prepare('INSERT OR REPLACE INTO protected_pings (target_id, target_type, added_by) VALUES (?, ?, ?)').run(target.id, type, interaction.member.id);
+      stmtUpsertProtected.run(target.id, type, interaction.member.id);
+      refreshProtectedPings(db);
 
       const embed = new EmbedBuilder()
-        .setColor(0xF1C40F)
+        .setColor(THEME.colors.warn)
+        .setAuthor({ name: THEME.brandName, iconURL: interaction.guild.iconURL({ size: 64 }) || undefined })
         .setTitle('Anti-Ping Protected')
         .setDescription(`${type === 'user' ? `<@${target.id}>` : `<@&${target.id}>`} is now protected. Pinging them will be blocked.`)
         .setTimestamp();
@@ -60,16 +69,24 @@ export default {
       const target = user || role;
       if (!target) return interaction.reply({ content: 'Specify a user or role.', flags: MessageFlags.Ephemeral });
 
-      db.prepare('DELETE FROM protected_pings WHERE target_id = ?').run(target.id);
+      stmtDeleteProtected.run(target.id);
+      refreshProtectedPings(db);
       const embed = new EmbedBuilder()
-        .setColor(0xF1C40F)
-        .setDescription(`Removed ${target} from the protected list.`);
+        .setColor(THEME.colors.warn)
+        .setAuthor({ name: THEME.brandName, iconURL: interaction.guild.iconURL({ size: 64 }) || undefined })
+        .setTitle('Anti-Ping Updated')
+        .setDescription(`Removed ${target} from the protected list.`)
+        .setTimestamp();
       return interaction.reply({ embeds: [embed] });
     }
 
     if (sub === 'list') {
-      const rows = db.prepare('SELECT * FROM protected_pings ORDER BY added_at DESC').all();
-      const embed = new EmbedBuilder().setColor(0xF1C40F).setTitle('Protected Ping Targets');
+      const rows = stmtListProtected.all();
+      const embed = new EmbedBuilder()
+        .setColor(THEME.colors.warn)
+        .setAuthor({ name: THEME.brandName, iconURL: interaction.guild.iconURL({ size: 64 }) || undefined })
+        .setTitle('Protected Ping Targets')
+        .setTimestamp();
       if (!rows.length) {
         embed.setDescription('No protected targets configured.');
       } else {

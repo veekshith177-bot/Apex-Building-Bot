@@ -54,7 +54,9 @@ body{
 .nav-item:hover{background:var(--card);color:var(--text)}
 .nav-item.active{background:var(--primary-glow);color:var(--primary)}
 .nav-item .material-icons{font-size:18px}
-.sidebar-footer{padding:12px 16px;border-top:1px solid var(--border);font-size:12px;color:var(--muted)}
+.sidebar-footer{padding:12px 16px;border-top:1px solid var(--border);font-size:12px;color:var(--muted);display:flex;align-items:center;justify-content:space-between;gap:10px}
+.logout{border:1px solid var(--border);background:transparent;color:var(--muted);padding:6px 10px;border-radius:8px;cursor:pointer;font-size:12px}
+.logout:hover{color:var(--text);border-color:var(--primary)}
 /* ── Main ── */
 .main{margin-left:var(--sidebar);flex:1;padding:24px 32px;max-width:calc(100vw - var(--sidebar))}
 .main-header{display:flex;align-items:center;justify-content:space-between;margin-bottom:24px}
@@ -163,7 +165,10 @@ tr:hover td{background:rgba(255,255,255,.02)}
     <div class="nav-item" data-page="applications"><span class="material-icons">description</span> Applications</div>
     <div class="nav-item" data-page="loa"><span class="material-icons">beach_access</span> Leave of Absence</div>
   </nav>
-  <div class="sidebar-footer" id="footerInfo">Loading...</div>
+  <div class="sidebar-footer">
+    <div id="footerInfo">Loading...</div>
+    <button class="logout" id="logoutBtn" title="Logout">Logout</button>
+  </div>
 </aside>
 
 <main class="main">
@@ -265,6 +270,11 @@ tr:hover td{background:rgba(255,255,255,.02)}
 const API='/api';
 let chartDaily=null, chartType=null;
 
+document.getElementById('logoutBtn')?.addEventListener('click', async () => {
+  try { await fetch('/api/auth/logout', { method: 'POST' }); } catch {}
+  location.href = '/login';
+});
+
 function tid(id){return id&&id.length>12?id.slice(0,6)+'…'+id.slice(-4):id||'—'}
 function fmt(d){return d?new Date(d+'Z').toLocaleString():'—'}
 function fmtShort(d){return d?new Date(d+'Z').toLocaleDateString():'—'}
@@ -299,6 +309,7 @@ function loadPage(name){
 // ── API helper ──
 async function api(path){
   const r=await fetch(API+path);
+  if(r.status===401){ location.href='/login'; return {}; }
   if(!r.ok)throw new Error(await r.text());
   return r.json();
 }

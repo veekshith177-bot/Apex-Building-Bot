@@ -70,6 +70,24 @@ function parseUrl(req) {
   return { pathname: url.pathname, searchParams: url.searchParams };
 }
 
+function readBody(req, { maxBytes = 64 * 1024 } = {}) {
+  return new Promise((resolve, reject) => {
+    let total = 0;
+    const chunks = [];
+    req.on('data', (chunk) => {
+      total += chunk.length;
+      if (total > maxBytes) {
+        reject(new Error('Body too large'));
+        req.destroy();
+        return;
+      }
+      chunks.push(chunk);
+    });
+    req.on('end', () => resolve(Buffer.concat(chunks).toString('utf8')));
+    req.on('error', reject);
+  });
+}
+
 function safeEqual(a, b) {
   const aBuf = Buffer.from(String(a ?? ''), 'utf8');
   const bBuf = Buffer.from(String(b ?? ''), 'utf8');
@@ -77,34 +95,65 @@ function safeEqual(a, b) {
   return crypto.timingSafeEqual(aBuf, bBuf);
 }
 
-function parseBasicAuth(req) {
-  const header = req.headers.authorization || '';
-  const [scheme, encoded] = header.split(' ');
-  if (!scheme || scheme.toLowerCase() !== 'basic' || !encoded) return null;
-  let decoded = '';
-  try {
-    decoded = Buffer.from(encoded, 'base64').toString('utf8');
-  } catch {
-    return null;
+function parseCookies(req) {
+  const header = String(req.headers.cookie || '');
+  const out = {};
+  if (!header) return out;
+  const parts = header.split(';');
+  for (const part of parts) {
+    const idx = part.indexOf('=');
+    if (idx < 0) continue;
+    const k = part.slice(0, idx).trim();
+    const v = part.slice(idx + 1).trim();
+    if (!k) continue;
+    out[k] = decodeURIComponent(v);
   }
-  const idx = decoded.indexOf(':');
-  if (idx < 0) return null;
-  return { username: decoded.slice(0, idx), password: decoded.slice(idx + 1) };
+  return out;
 }
 
-function requireDashboardAuth(req, res, authCfg) {
-  if (!authCfg?.enabled) return true;
+function setCookie(res, name, value, { maxAgeSeconds = 86400, httpOnly = true, sameSite = 'Lax', secure = false } = {}) {
+  const parts = [
+    `${name}=${encodeURIComponent(value)}`,
+    'Path=/',
+    `Max-Age=${Math.max(0, Math.floor(maxAgeSeconds))}`,
+    `SameSite=${sameSite}`,
+  ];
+  if (httpOnly) parts.push('HttpOnly');
+  if (secure) parts.push('Secure');
+  res.setHeader('Set-Cookie', parts.join('; '));
+}
 
-  const creds = parseBasicAuth(req);
-  const okUser = safeEqual(creds?.username ?? '', authCfg.username);
-  const okPass = safeEqual(creds?.password ?? '', authCfg.password);
-  if (okUser && okPass) return true;
+function clearCookie(res, name, { secure = false } = {}) {
+  setCookie(res, name, '', { maxAgeSeconds: 0, secure });
+}
 
-  res.statusCode = 401;
+function isAuthed(req, authState) {
+  if (!authState?.enabled) return true;
+  const cookies = parseCookies(req);
+  const token = cookies[authState.cookieName];
+  if (!token) return false;
+  const session = authState.sessions.get(token);
+  if (!session) return false;
+  if (Date.now() > session.expiresAt) {
+    authState.sessions.delete(token);
+    return false;
+  }
+  return true;
+}
+
+function requireAuthOrRedirect(req, res, authState, { forApi = false } = {}) {
+  if (isAuthed(req, authState)) return true;
+  if (!authState?.enabled) return true;
+
+  if (forApi) {
+    sendJson(res, { error: 'Unauthorized' }, 401);
+    return false;
+  }
+
+  res.statusCode = 302;
   setCommonSecurityHeaders(res);
-  res.setHeader('Content-Type', 'text/plain; charset=utf-8');
-  res.setHeader('WWW-Authenticate', 'Basic realm="Apex Dashboard", charset="UTF-8"');
-  res.end('Unauthorized');
+  res.setHeader('Location', '/login');
+  res.end();
   return false;
 }
 
@@ -316,6 +365,7 @@ function apiRoutes(db) {
   return route;
 }
 
+const staticCache = new Map();
 function serveStatic(pathname, res) {
   let filePath = path.join(publicDir, pathname === '/' ? 'index.html' : pathname);
 
@@ -332,7 +382,15 @@ function serveStatic(pathname, res) {
 
   const ext = path.extname(filePath).toLowerCase();
   const contentType = MIME[ext] || 'application/octet-stream';
-  const content = fs.readFileSync(filePath);
+  const st = fs.statSync(filePath);
+  const cached = staticCache.get(filePath);
+  let content;
+  if (cached && cached.mtimeMs === st.mtimeMs) {
+    content = cached.content;
+  } else {
+    content = fs.readFileSync(filePath);
+    staticCache.set(filePath, { mtimeMs: st.mtimeMs, content });
+  }
   res.statusCode = 200;
   setCommonSecurityHeaders(res);
   res.setHeader('Content-Type', contentType);
@@ -342,25 +400,104 @@ function serveStatic(pathname, res) {
 export function startDashboard(db, port) {
   const apiRouter = apiRoutes(db);
   const dashboardPassword = String(process.env.DASHBOARD_PASSWORD || '');
-  const authCfg = {
+  const authState = {
     enabled: dashboardPassword.length > 0,
-    username: String(process.env.DASHBOARD_USERNAME || 'admin'),
     password: dashboardPassword,
+    cookieName: 'dash_session',
+    sessions: new Map(),
+    cookieSecure: String(process.env.DASHBOARD_COOKIE_SECURE || '').toLowerCase() === 'true',
+    sessionTtlSeconds: Math.min(Math.max(parseInt(process.env.DASHBOARD_SESSION_TTL || '86400') || 86400, 300), 7 * 86400),
   };
 
-  if (!authCfg.enabled) {
-    warn('Dashboard is running WITHOUT auth. Set DASHBOARD_PASSWORD to enable Basic Auth.');
+  if (!authState.enabled) {
+    warn('Dashboard is running WITHOUT auth. Set DASHBOARD_PASSWORD to enable the login screen.');
   }
+
+  // Prevent unbounded growth if many sessions are created.
+  const sessionGc = setInterval(() => {
+    const now = Date.now();
+    for (const [token, s] of authState.sessions) {
+      if (!s || now > s.expiresAt) authState.sessions.delete(token);
+    }
+  }, 60_000);
+  sessionGc.unref?.();
 
   const server = http.createServer((req, res) => {
     const { pathname, searchParams } = parseUrl(req);
 
-    if (!requireDashboardAuth(req, res, authCfg)) return;
+    // Auth endpoints
+    if (pathname === '/api/auth/login' && req.method === 'POST') {
+      if (!authState.enabled) {
+        sendJson(res, { error: 'Dashboard auth is disabled' }, 400);
+        return;
+      }
+      readBody(req, { maxBytes: 8 * 1024 }).then((raw) => {
+        let body = null;
+        try {
+          body = JSON.parse(raw || '{}');
+        } catch {
+          sendJson(res, { error: 'Invalid JSON' }, 400);
+          return;
+        }
+
+        const pass = String(body?.password || '');
+        if (!safeEqual(pass, authState.password)) {
+          sendJson(res, { error: 'Invalid password' }, 401);
+          return;
+        }
+
+        const token = crypto.randomBytes(32).toString('base64url');
+        const expiresAt = Date.now() + authState.sessionTtlSeconds * 1000;
+        authState.sessions.set(token, { expiresAt });
+
+        setCommonSecurityHeaders(res);
+        setCookie(res, authState.cookieName, token, {
+          maxAgeSeconds: authState.sessionTtlSeconds,
+          secure: authState.cookieSecure,
+          sameSite: 'Lax',
+          httpOnly: true,
+        });
+        sendJson(res, { ok: true }, 200);
+      }).catch((e) => {
+        sendJson(res, { error: e.message || 'Bad request' }, 400);
+      });
+      return;
+    }
+
+    if (pathname === '/api/auth/logout' && req.method === 'POST') {
+      if (authState.enabled) {
+        const cookies = parseCookies(req);
+        const token = cookies[authState.cookieName];
+        if (token) authState.sessions.delete(token);
+        setCommonSecurityHeaders(res);
+        clearCookie(res, authState.cookieName, { secure: authState.cookieSecure });
+      }
+      sendJson(res, { ok: true }, 200);
+      return;
+    }
 
     if (pathname.startsWith('/api/')) {
+      if (pathname !== '/api/auth/login' && pathname !== '/api/auth/logout') {
+        if (!requireAuthOrRedirect(req, res, authState, { forApi: true })) return;
+      }
       if (apiRouter(pathname, searchParams, req, res)) return;
       sendJson(res, { error: 'Not found' }, 404);
       return;
+    }
+
+    if (authState.enabled) {
+      if (pathname === '/login') {
+        if (isAuthed(req, authState)) {
+          res.statusCode = 302;
+          setCommonSecurityHeaders(res);
+          res.setHeader('Location', '/');
+          res.end();
+          return;
+        }
+        serveStatic('/login.html', res);
+        return;
+      }
+      if (!requireAuthOrRedirect(req, res, authState, { forApi: false })) return;
     }
 
     serveStatic(pathname, res);
@@ -370,6 +507,10 @@ export function startDashboard(db, port) {
     info(`──────────────────────────────────────`);
     info(`  Dashboard live at http://eu2.vnav.cloud:${port}`);
     info(`──────────────────────────────────────`);
+  });
+
+  server.on('close', () => {
+    try { clearInterval(sessionGc); } catch {}
   });
 
   return server;

@@ -97,14 +97,20 @@ SFTP_USERNAME=sftp_username_here
 SFTP_PASSWORD=sftp_password_here
 
 # Dashboard (recommended)
-# Protects the dashboard + API with HTTP Basic Auth.
+# Protects the dashboard + API with a login screen (cookie session).
 DASHBOARD_PORT=2024
-DASHBOARD_USERNAME=admin
 DASHBOARD_PASSWORD=your_strong_password_here
+DASHBOARD_SESSION_TTL=86400
+# If you terminate TLS before Node (recommended), keep this false. Set true only if Node itself is behind HTTPS.
+DASHBOARD_COOKIE_SECURE=false
 
 # Optional: allow cross-origin dashboard API access (not needed for the built-in UI)
 # Example: https://yourdomain.com  (avoid "*" unless you understand the risk)
 DASHBOARD_CORS_ORIGIN=
+
+# Bot embed theming (optional)
+BOT_BRAND_NAME=Apex Bot
+BOT_BRAND_COLOR=0x5865F2
 ```
 
 ### 4. Deploy Slash Commands
@@ -112,6 +118,7 @@ Register application commands with Discord API:
 ```bash
 npm run deploy
 ```
+If you add new commands (like `/health`), re-run deploy to register them.
 
 ### 5. Run the Bot
 To start the bot in production mode:

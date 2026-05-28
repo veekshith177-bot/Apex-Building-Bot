@@ -1,8 +1,12 @@
 import { EmbedBuilder, MessageFlags } from 'discord.js';
 import db from '../database.js';
 import { isMod } from '../utils.js';
+import { THEME } from '../ui/theme.js';
 
 const MESSAGE_LINK_RE = /^https:\/\/discord\.com\/channels\/(\d+)\/(\d+)\/(\d+)$/;
+
+const stmtUpsertReactionRole = db.prepare('INSERT OR REPLACE INTO reaction_roles (message_id, channel_id, emoji, role_id) VALUES (?, ?, ?, ?)');
+const stmtDeleteReactionRole = db.prepare('DELETE FROM reaction_roles WHERE message_id = ? AND emoji = ?');
 
 export default {
   async execute(interaction) {
@@ -34,8 +38,7 @@ export default {
         return interaction.reply({ content: 'Message not found in that channel.', flags: MessageFlags.Ephemeral });
       }
 
-      db.prepare('INSERT OR REPLACE INTO reaction_roles (message_id, channel_id, emoji, role_id) VALUES (?, ?, ?, ?)')
-        .run(messageId, channel.id, emoji, role.id);
+      stmtUpsertReactionRole.run(messageId, channel.id, emoji, role.id);
 
       try {
         await msg.react(emoji);
@@ -44,15 +47,17 @@ export default {
       }
 
       const embed = new EmbedBuilder()
-        .setColor(0xF1C40F)
-        .setDescription(`Reaction role set: ${emoji} on ${channel} → ${role}`);
+        .setColor(THEME.colors.warn)
+        .setAuthor({ name: THEME.brandName, iconURL: interaction.guild.iconURL({ size: 64 }) || undefined })
+        .setDescription(`Reaction role set: ${emoji} on ${channel} → ${role}`)
+        .setTimestamp();
       return interaction.reply({ embeds: [embed], flags: MessageFlags.Ephemeral });
     }
 
     if (sub === 'remove') {
       const emoji = interaction.options.getString('emoji');
 
-      db.prepare('DELETE FROM reaction_roles WHERE message_id = ? AND emoji = ?').run(messageId, emoji);
+      stmtDeleteReactionRole.run(messageId, emoji);
 
       const msg = await channel.messages.fetch(messageId).catch(() => null);
       if (msg) {
@@ -61,8 +66,10 @@ export default {
       }
 
       const embed = new EmbedBuilder()
-        .setColor(0xF1C40F)
-        .setDescription(`Removed reaction role for ${emoji}.`);
+        .setColor(THEME.colors.warn)
+        .setAuthor({ name: THEME.brandName, iconURL: interaction.guild.iconURL({ size: 64 }) || undefined })
+        .setDescription(`Removed reaction role for ${emoji}.`)
+        .setTimestamp();
       return interaction.reply({ embeds: [embed], flags: MessageFlags.Ephemeral });
     }
   },
